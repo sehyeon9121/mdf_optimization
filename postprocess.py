@@ -82,3 +82,44 @@ def save_section_images(results, config, strip, output_dir, max_images=10):
         )
 
     print(f"  이미지 저장 완료: {output_dir} ({min(len(results), max_images)}개)")
+
+
+def save_results_to_excel(results, save_path):
+    """
+    스트립 수별 단면 결과 전체를 Excel로 저장.
+
+    컬럼: strip_count, search_type, cost, A, Ix, Iy, Ix/Iy, efficiency, name
+    strip_count 오름차순 → efficiency 내림차순으로 정렬하여 저장.
+    """
+    if not results:
+        print("  저장할 결과 없음")
+        return
+
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    rows = []
+    for r in results:
+        Ix = r['Ix']
+        Iy = r['Iy']
+        rows.append({
+            'strip_count':  r['strip_count'],
+            'search_type':  r.get('search_type', '-'),
+            'cost':         r['cost'],
+            'A(mm²)':       r['A'],
+            'Ix(mm⁴)':      Ix,
+            'Iy(mm⁴)':      Iy,
+            'Ix/Iy':        round(Ix / Iy, 4) if Iy > 0 else None,
+            'efficiency':   r['efficiency'],
+            'name':         r.get('name', ''),
+        })
+
+    df = pd.DataFrame(rows)
+    df = df.sort_values(['strip_count', 'efficiency'], ascending=[True, False])
+
+    try:
+        df.to_excel(save_path, index=False)
+        print(f"  Excel 저장 완료: {save_path} ({len(df)}행)")
+    except ImportError:
+        csv_path = save_path.replace('.xlsx', '.csv')
+        df.to_csv(csv_path, index=False, encoding='utf-8-sig')
+        print(f"  openpyxl 미설치 → CSV로 저장: {csv_path} ({len(df)}행)")

@@ -1,0 +1,94 @@
+# Project Context: Section Optimization for Structural Design
+
+## 1. Project Purpose
+
+This project is not just a Python coding exercise.
+
+The purpose is to develop a structurally explainable section optimization process.  
+The goal is to generate multiple section candidates, evaluate their structural performance, filter them by design constraints, and select the most efficient section based on material usage, weight, cost, or performance efficiency.
+
+The final result should be explainable in structural engineering terms, not just as a numerical minimum.
+
+## 2. What I Want to Build
+
+I want to build a process that can answer the following questions:
+
+1. What section candidates exist?
+2. How were those candidates generated?
+3. What structural properties are evaluated?
+4. Which constraints must each section satisfy?
+5. Why are some candidates rejected?
+6. Why is the final selected section reasonable?
+7. How can this process later connect to Midas or seismic design optimization?
+
+## 3. Current Project Status
+
+- Python environment is prepared.
+- Work is being done in VS Code.
+- Git is being used for version control.
+- A virtual environment `.venv` exists.
+- Basic packages such as numpy, pandas, matplotlib, and pyyaml are installed.
+- A section candidate CSV such as `outputs/generated_sections.csv` has already been generated.
+- The next goal is not to blindly implement code, but to clarify the structural optimization logic.
+
+## 4. Optimization Logic
+
+The basic optimization process should be:
+
+1. Generate section candidates.
+2. Calculate or read structural properties for each candidate.
+3. Apply strength, stiffness, displacement, and constructability constraints.
+4. Filter out candidates that do not satisfy the constraints.
+5. Define an objective function such as minimum material usage, minimum weight, minimum cost, or maximum efficiency.
+6. Select the best candidate.
+7. Save and explain the result.
+
+A report-style explanation should be possible:
+
+“Generated section candidates were evaluated based on structural performance indicators. Candidates satisfying strength and stiffness constraints were selected, and the optimal section was determined by minimizing material usage while satisfying all required design conditions.”
+
+## 5. Important Rules for Claude
+
+- Do not create a new project.
+- Work only inside the current VS Code project folder.
+- Before editing code, inspect the existing file structure.
+- Before modifying files, explain which files will be changed and why.
+- Do not overwrite existing code without explanation.
+- Do not jump directly to advanced AI algorithms.
+- First clarify the structural meaning, constraints, and objective function.
+- Code should be added step by step.
+- The process must be explainable for a report or paper.
+- When implementing, prefer small, testable changes.
+- Output files should be saved under `outputs/`.
+
+## 6. Current Research Direction
+
+This project may later expand into:
+
+- Midas result integration
+- Section size and placement optimization
+- Column, beam, core, or damping element optimization
+- Exhaustive search
+- Weighted scoring
+- Genetic algorithm
+- Bayesian optimization
+- Gaussian Process optimization
+- AI-based seismic design
+
+However, the current priority is to build a clear and structurally valid optimization process before using advanced AI methods.
+
+## 7. How Claude Should Respond
+
+When helping with this project, always consider:
+
+1. What is being optimized?
+2. Why is it being optimized?
+3. What are the candidates?
+4. What are the evaluation metrics?
+5. What are the constraints?
+6. What is the objective function?
+7. Why is the final result structurally reasonable?
+8. What is the next smallest step?
+
+Do not immediately write code unless explicitly asked.
+First explain the design logic and project direction.

@@ -1,90 +1,128 @@
 """
 main.py
-MDF Strip 단면 최적화 실행 진입점
+MDF Strip 단면 최적화 — 스트립 수별 배치 탐색 진입점
 
 실행:
     python main.py
+
+처리 흐름:
+    N = 1 ~ 25 각각:
+      N ≤ exhaustive_max (기본 6) → 전수탐색: 모든 연결 배치 × 모든 방향 조합
+      N >  exhaustive_max         → GA탐색: 최대 ga_max_collect개 유효 배치 수집
+
+    결과:
+      outputs/results_by_strip_count.xlsx  — 전체 결과 (strip_count별 정렬)
+      outputs/images/strip_search/         — N별 최적 단면 이미지
 """
 import os
-import sys
+import yaml
 
-# 현재 파일 위치를 모듈 탐색 경로에 추가
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from materials import MDFStrip
+from ga_section import enumerate_all_arrangements, run_ga_by_strip_count
+from postprocess import save_results_to_excel, save_section_images
 
-from materials import load_config, MDFStrip
-from ga_section import run_ga
-from postprocess import save_results_to_csv, save_section_images
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_DIR = os.path.join(BASE_DIR, 'outputs')
+
+def load_config():
+    config_path = os.path.join(BASE_DIR, 'config.yaml')
+    with open(config_path, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f)
+
+
+def print_summary(best_per_n):
+    """N별 최적 단면 요약 테이블 출력"""
+    header = (
+        f"{'N':>3}  {'탐색방법':^8}  {'발견수':>6}  "
+        f"{'cost':>5}  {'Ix':>11}  {'Iy':>11}  {'Ix/Iy':>7}  {'efficiency':>11}"
+    )
+    print(header)
+    print('-' * len(header))
+    for n, method, count, best in best_per_n:
+        Ix, Iy = best['Ix'], best['Iy']
+        ratio = f"{Ix/Iy:.3f}" if Iy > 0 else '-'
+        print(
+            f"{n:>3}  {method:^8}  {count:>6}  "
+            f"{best['cost']:>5}  {Ix:>11.1f}  {Iy:>11.1f}  "
+            f"{ratio:>7}  {best['efficiency']:>11.4f}"
+        )
 
 
 def main():
-    print("=" * 55)
-    print("  MDF Strip 단면 최적화")
-    print("=" * 55)
+    print("=" * 70)
+    print("  MDF Strip 단면 최적화 — 스트립 수별 전수/GA 탐색 (N=1~25)")
+    print("=" * 70)
 
-    # 설정 및 재료 로드
     config = load_config()
     strip  = MDFStrip(config)
 
-    print(f"\n[설정]")
-    print(f"  격자    : {config['grid']['rows']} x {config['grid']['cols']} "
-          f"(셀 크기 {config['grid']['cell_size']}mm)")
-    print(f"  스트립  : {strip.b}mm x {strip.h}mm, 단가={strip.cost}")
-    print(f"  GA      : 세대={config['ga']['generations']}, "
-          f"집단={config['ga']['population_size']}")
+    rows          = config['grid']['rows']
+    cols          = config['grid']['cols']
+    n_max         = rows * cols                          # 25
+    exhaustive_max = config['ga'].get('exhaustive_max', 6)
+    ga_max_collect = config['ga'].get('ga_max_collect', 500)
 
-    # ── 기둥 단면 최적화 ──────────────────────────────────────
-    print("\n[기둥 단면 최적화]  Ix/Iy = 0.7 ~ 1.3")
-    column_results = run_ga(config, strip, section_type='column', seed=42, verbose=True)
+    print(f"\n격자       : {rows}×{cols}  ({n_max}셀)")
+    print(f"스트립 규격 : {strip.b}mm × {strip.h}mm  (가로=1, 세로=2)")
+    print(f"단가       : {strip.cost}원/개")
+    print(f"전수탐색   : N = 1 ~ {exhaustive_max}  (모든 연결 배치)")
+    print(f"GA탐색     : N = {exhaustive_max+1} ~ {n_max}  (최대 {ga_max_collect}개/N)")
+    print()
 
-    # ── 코어 단면 최적화 ──────────────────────────────────────
-    print("\n[코어 단면 최적화]  Ix/Iy = 0.5 ~ 2.0")
-    core_results = run_ga(config, strip, section_type='core', seed=123, verbose=True)
+    all_results  = []   # 전체 결과 누적
+    summary_rows = []   # 요약 출력용 (n, method, count, best)
 
-    # ── 결과 저장 ─────────────────────────────────────────────
-    print("\n[결과 저장]")
-    all_results = column_results + core_results
+    for n in range(1, n_max + 1):
 
-    save_results_to_csv(all_results,    os.path.join(OUTPUT_DIR, 'generated_sections.csv'))
-    save_results_to_csv(column_results, os.path.join(OUTPUT_DIR, 'top_column_sections.csv'))
-    save_results_to_csv(core_results,   os.path.join(OUTPUT_DIR, 'top_core_sections.csv'))
+        if n <= exhaustive_max:
+            # ── 전수탐색 ────────────────────────────────────────────
+            print(f"  [N={n:2d}] 전수탐색 중...", end=' ', flush=True)
+            results = enumerate_all_arrangements(n, config, strip)
+            method  = '전수탐색'
+        else:
+            # ── GA 탐색 ─────────────────────────────────────────────
+            print(f"  [N={n:2d}] GA탐색 중...", end=' ', flush=True)
+            results = run_ga_by_strip_count(
+                config, strip, n,
+                seed=42, verbose=False,
+                max_collect=ga_max_collect,
+            )
+            method = 'GA'
 
-    save_section_images(
-        column_results, config, strip,
-        output_dir=os.path.join(OUTPUT_DIR, 'images', 'column'),
-        max_images=10
-    )
-    save_section_images(
-        core_results, config, strip,
-        output_dir=os.path.join(OUTPUT_DIR, 'images', 'core'),
-        max_images=10
-    )
+        # search_type 태그 부여
+        for r in results:
+            r['search_type'] = method
 
-    # ── 최적 결과 요약 출력 ───────────────────────────────────
-    print("\n[최적 결과 요약]")
+        all_results.extend(results)
 
-    if column_results:
-        b = column_results[0]
-        ratio = b['Ix'] / b['Iy']
-        print(f"  기둥 최적: {b['name']}")
-        print(f"    스트립={b['strip_count']}개  A={b['A']}mm²")
-        print(f"    Ix={b['Ix']:.2f}  Iy={b['Iy']:.2f}  Ix/Iy={ratio:.3f}")
-        print(f"    cost={b['cost']}  efficiency={b['efficiency']:.4f}")
-    else:
-        print("  기둥: 유효 단면 없음")
+        if results:
+            best = results[0]   # efficiency 내림차순 정렬 첫 번째
+            Ix, Iy = best['Ix'], best['Iy']
+            ratio = f"{Ix/Iy:.3f}" if Iy > 0 else '-'
+            print(
+                f"{len(results):>6}개 발견  |  "
+                f"최적 efficiency={best['efficiency']:.4f}  "
+                f"cost={best['cost']}  Ix/Iy={ratio}"
+            )
+            summary_rows.append((n, method, len(results), best))
+        else:
+            print("유효 단면 없음")
 
-    if core_results:
-        b = core_results[0]
-        ratio = b['Ix'] / b['Iy']
-        print(f"  코어 최적: {b['name']}")
-        print(f"    스트립={b['strip_count']}개  A={b['A']}mm²")
-        print(f"    Ix={b['Ix']:.2f}  Iy={b['Iy']:.2f}  Ix/Iy={ratio:.3f}")
-        print(f"    cost={b['cost']}  efficiency={b['efficiency']:.4f}")
-    else:
-        print("  코어: 유효 단면 없음")
+    # ── Excel 저장 ─────────────────────────────────────────────────
+    excel_path = os.path.join(BASE_DIR, config['output']['excel_path'])
+    os.makedirs(os.path.dirname(excel_path), exist_ok=True)
+    print(f"\n[저장] Excel ({len(all_results)}행) → {excel_path}")
+    save_results_to_excel(all_results, excel_path)
 
+    # ── 이미지 저장 (N별 최적 단면 1개) ───────────────────────────
+    best_images = [row[3] for row in summary_rows]   # 각 N의 최적 단면
+    image_dir   = os.path.join(BASE_DIR, config['output']['image_dir'])
+    print(f"[저장] 이미지 ({len(best_images)}개) → {image_dir}")
+    save_section_images(best_images, config, strip, image_dir, max_images=n_max)
+
+    # ── 콘솔 요약 ─────────────────────────────────────────────────
+    print(f"\n[N별 최적 단면 요약]")
+    print_summary(summary_rows)
     print("\n완료!")
 
 
