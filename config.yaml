@@ -1,0 +1,28 @@
+# MDF Strip 단면 최적화 설정 파일
+
+strip:
+  b: 4               # 기본 방향 x-폭 (mm)
+  h: 6               # 기본 방향 y-높이 (mm)
+  cost_per_unit: 10  # 스트립 1개 단가
+
+grid:
+  rows: 5            # 격자 행 수 (y방향)
+  cols: 5            # 격자 열 수 (x방향)
+  cell_size: 6       # 격자 셀 크기 (mm, 정사각형)
+
+column_filter:
+  ix_iy_min: 0.7
+  ix_iy_max: 1.3
+
+core_filter:
+  ix_iy_min: 0.5
+  ix_iy_max: 2.0
+
+ga:
+  population_size: 300
+  generations: 150
+  mutation_rate: 0.12
+  crossover_rate: 0.8
+  elite_ratio: 0.1
+  top_n: 20
+  min_strips: 2
